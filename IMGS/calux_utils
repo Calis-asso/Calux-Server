@@ -1,0 +1,416 @@
+#!/bin/bash
+
+work_dir=/tmp/tools
+
+_usage ()
+{
+    echo "usage ${0} <save|restore|iso> <create=0|1> <param_arch>"
+    echo
+    echo " General options:"
+    echo "    -N <iso_name>      Set an iso filename (prefix)"
+    echo "                        Default: ${iso_name}"
+    echo "    -V <iso_version>   Set an iso version (in filename)"
+    echo "                        Default: ${iso_version}"
+    echo "    -L <iso_label>     Set an iso label (disk label)"
+    echo "                        Default: ${iso_label}"
+    echo "    -D <install_dir>   Set an install_dir (directory inside iso)"
+    echo "                        Default: ${install_dir}"
+    echo "    -w <work_dir>      Set the working directory"
+    echo "                        Default: ${work_dir}"
+    echo "    -o <out_dir>       Set the output directory"
+    echo "                        Default: ${out_dir}"
+    echo "    -v                 Enable verbose output"
+    echo "    -h                 This help message"
+    exit ${1}
+}
+
+# # Helper function to run make_*() only one time per architecture.
+# run_once() {
+#     if [[ ! -e ${work_dir}/done.${1} ]]; then
+#         $1
+#         RES_RUN=$?
+#         [[ ! $RES_RUN -gt 0 ]] && touch ${work_dir}/done.${1}
+#         return $RES_RUN
+#     fi
+#     return 0
+# }
+
+chroot_setup() {
+	CHROOT_ACTIVE_MOUNTS=()
+
+	# On monte notre partition système dans /mnt
+	chroot_maybe_add_mount "! mountpoint -q '$1'" $PART_CALUX "$1" 
+	mount_setup "$@"
+	# Si la partition home existe, alors on la monte
+	blkid | grep -q $HOME_LABEL && chroot_add_mount $HOME_DISK "$1/home" 
+#   if [ $( blkid | grep $HOME_LABEL | wc -l ) -gt 0 ]; then
+# 	chroot_add_mount $HOME_DISK "$1/home" 
+#   fi
+	chroot_add_resolv_conf "$ROOT_CALUX"
+	cp $WORK_DIR/prepare_2_maj.sh "$ROOT_CALUX/tmp/"
+	cp $WORK_DIR/build-iso-live.sh "$ROOT_CALUX/tmp/"
+	cp $WORK_DIR/futil "$ROOT_CALUX/tmp/"
+	cp $WORK_DIR/doexec "$ROOT_CALUX/tmp/"
+	cp $WORK_DIR/bash-utils.sh "$ROOT_CALUX/tmp/"
+	# apt need it... but i should make another mount for /run...
+	mkdir $ROOT_CALUX/run/lock/
+	
+	[[ -e /media/srv/calux/IMGS ]] && mkdir -p $ROOT_CALUX/media/srv && chroot_add_mount /media/srv "$ROOT_CALUX/media/srv" --bind 
+
+}
+
+teardown() {
+	cd
+	chroot_teardown  
+	[[ -e $ROOT_CALUX/media/srv ]] && rmdir $ROOT_CALUX/media/srv
+}
+
+chroot2calux () {
+	arch_chroot "$ROOT_CALUX" "${1}" 
+# 	echo $?
+# 	chroot $ROOT_CALUX ${1}
+}
+
+finish() { :
+	# Et pour finir on démonte le cache des paquets
+# 	mountpoint -q $ROOT_CALUX/var/cache/apt/archives && msg_nn2 "32" "32" "Démontage de %s" "$ROOT_CALUX/var/cache/apt/archives..." && umount $ROOT_CALUX/var/cache/apt/archives && rmdir $ROOT_CALUX/var/cache/apt/archives && mv $ROOT_CALUX/var/cache/apt/archives.empty $ROOT_CALUX/var/cache/apt/archives && msg_nn_end "ok"
+
+}
+
+# END CHROOT
+
+# BEGIN fdisk functions
+# TODO changer /dev/sda
+# On crée une nouvelle partition pour home
+fdisk_home_part () {
+#     A CONSERVER INTACT !
+	fdisk $1 <<EOF
+n
+p
+3
+
+
+w
+EOF
+}
+
+# Clonezilla 10 utilise une commande sfdsik qui n'existe pas dans notre cas...
+# Donc on partionne nous meme jusqu'a clonezilla 12 ou 11...
+fdisk_create_parts () {
+#     A CONSERVER INTACT ! 
+fdisk $1 <<EOF
+o
+n
+p
+1
+
+2889727
+t
+82
+n
+p
+2
+
+32186367
+w
+EOF
+}
+
+# Teste si on a demandé des confirmation 
+is_confirm() {
+	[[ "$NO_ASK" == "-c" ]] && return 0
+	return 1
+}
+
+calux_restore() {
+	is_confirm && rid_exit "Lancer la restauration ?"
+	[ "$CLEAN" == "" ] && CLEAN="o"
+# 	(( $PARAM_ARCH )) && msg_n "Création de la nouvelle table de  partition sur %s (%s)" "$DISK_CALUX" "$DISK_CALUX" && run_once calux_create_parts
+	is_confirm && exe $COMMAND_RESTORE || exe -q $COMMAND_RESTORE
+	return $?
+}
+
+calux_create_parts() {
+	loading fdisk_create_parts "$DISK_CALUX"
+	return $?
+}
+
+calux_create_home() {
+	loading "Création de la nouvelle partition %s avec fdisk" "La partition %s à été créée" "$HOME_LABEL" fdisk_home_part "$DISK_CALUX"
+	loading "\r" "Veuillez patienter..." sleep 3
+	partprobe
+	return $?
+}
+
+calux_format_part() {
+#  bash
+    chroot_setup "$ROOT_CALUX" 
+#     fdisk -l
+#     bash
+   	loading "\r" "Veuillez patienter..." sleep 7
+#     || return 1
+#    mountpoint -q "$ROOT_CALUX/home" && umount "$ROOT_CALUX/home"
+	loading "Formatage de la partition %s..." "La partition %s a été formatée avec succès" "$HOME_LABEL" chroot2calux "/sbin/mkfs.ext4 -F -L $HOME_LABEL $PART_HOME"
+	RES_FORMAT=$?
+#	blkid | grep -q $HOME_LABEL && loading "\r" "Veuillez patienter..." sleep 3 && mount $HOME_DISK "$ROOT_CALUX/home" 
+	teardown "reset" 
+	return $RES_FORMAT
+}
+
+calux_conf_part() {
+	msg_n "Configuration de la nouvelle partition"
+	msg_n2 "Montage de %s" "$ROOT_CALUX"
+	mount $PART_CALUX $ROOT_CALUX
+	msg_n2 "Création du dossier %s Montage de %s/_home" "$ROOT_CALUX"
+	! [[ -d "$ROOT_CALUX/_home" ]] && mkdir $ROOT_CALUX/_home
+	mount $HOME_DISK $ROOT_CALUX/_home
+	msg_n2 "Ajout de %s monté sur /home dans fstab " "$HOME_LABEL"
+	echo -e "\n#$LABEL ($PART_HOME) on /home\n$UUID       /home       ext4    defaults        0       2" >> $ROOT_CALUX/etc/fstab
+
+# 					
+# 					# NETTOYAGE
+	msg_nn2 "Nettoyage de la corbeille, des miniatures, des emplacements récents..."
+	rm -r -f $ROOT_CALUX/home/*/.local/share/Trash/files/* 
+	rm $ROOT_CALUX/home/*/.thumbnails/normal/*
+	rm $ROOT_CALUX/home/*/.local/share/recently-used.xbel
+	msg_nn_end "ok"
+# 					msg_n2 "Nettoyage"
+# 					msg_n2 "Suppression de ~/.local/share/recently-used.xbel"
+	
+# 					msg_nn2 "Déplacement des dossiers utilisateurs vers la partition nouvellement créée..."
+	loading "Déplacement des dossiers utilisateurs vers la partition nouvellement créée..." "Déplacement effectué avec succès" mv $ROOT_CALUX/home/* $ROOT_CALUX/_home/
+# 					msg_nn_end "ok"
+
+	msg_nn2 "Démontage de %s..." "$ROOT_CALUX"
+	umount $ROOT_CALUX/_home 
+	rmdir $ROOT_CALUX/_home
+	umount $ROOT_CALUX
+	msg_nn_end "ok"
+	
+	
+# 	return $?
+}
+
+calux_clean() {
+# 	Montage des partition sroot et home
+	chroot_setup "$ROOT_CALUX"
+		
+# 					msg_n2 "Desinstallation de virtualbox-guest-utils clonezilla PinguyBuilder..."
+	loading "Desinstallation de virtualbox-guest-utils clonezilla PinguyBuilder..." "Désinstallation terminée" chroot2calux "aptitude purge -y virtualbox-guest-dkms virtualbox-guest-x11 virtualbox-guest-utils squashfs-tools ubiquity-frontend-debconf discover xresprobe aufs-tools dpkg-dev plymouth-x11 clonezilla PinguyBuilder partclone" || return 1
+# 					arch_chroot "/bin/bash"
+# 					msg_n2 "Desinstallation de tout les paquets inutiles et perimes"
+	loading "\r" "Desinstallation de tout les paquets inutiles et perimes" chroot2calux "aptitude autoclean" || return 1
+	loading "\r" "Desinstallation de tout les paquets inutiles et perimes" chroot2calux "apt-get autoremove --purge" || return 1
+	msg_n "32" "32" "Fin du nettoyage..."
+	
+# 					msg_n2 "Nettoyage de ~/.bash_history"
+# 					arch_chroot "history -c"
+# 					arch_chroot "su user -c \\\"history -c\\\""
+# 					arch_chroot "su enfants -c \\\"history -c\\\""
+# 					arch_chroot "su public -c \\\"history -c\\\""
+# 					echo "$NAME_CALUX" >  $ROOT_CALUX/.$BACKUP
+	echo "$(date -I)" > $ROOT_CALUX/.$BACKUP 
+	teardown "reset" 
+	return 0
+}
+
+calux_install_grub() {
+	loading "Installation de GRUB sur le disque %s..." "Grub à été installé sur %s." "$DISK_CALUX" chroot2calux "grub-install --recheck $DISK_CALUX"
+	loading "Création du fichier de configuration GRUB" "Fichier de configuration GRUB créé." chroot2calux "update-grub" 
+	return $?
+}
+
+calux_maj() {
+	# On monte notre partition système dans /mnt
+# 	! is_confirm && 
+	if rid_continue "Installer les mises a jours ?"; then
+        chroot2calux "bash /tmp/prepare_2_maj.sh $(is_confirm && echo "-y" )"
+        return $?
+    fi
+    return 1
+}
+
+calux_iso() {
+	rid_continue "Créer l'ISO de Calux ?" && chroot2calux "bash /tmp/build-iso-live.sh"
+	return $?
+}
+
+# END
+WORK_DIR="/tmp/tools"
+NO_ASK="-c"
+[[ "$1" == "-y" ]] && NO_ASK=" --batch" && shift
+OP=$1
+CREATE=$2
+PARAM_ARCH=$( [ "$3" == "arch" ] && echo "1" || echo "0" )
+LOCALISATION="fr"
+ROOT_CALUX="/mnt"
+DISK_CALUX="/dev/sda"
+PART_CALUX=$DISK_CALUX\2
+PART_HOME=$DISK_CALUX\3
+RELEASE="calux_version"
+# BACKUP="$( (( ! CREATE )) && cat calux_version || cat calux_create_version )"
+HOME_LABEL="calux-home"
+HOME_DISK="/dev/disk/by-label/$HOME_LABEL"
+VERSION=4.0
+CHECK_RESTORE="-scr"
+CHECK_SAVE="-scs"
+(( $PARAM_ARCH )) && PATH=$PATH:/bin:/sbin:/usr/sbin
+ARCH_SYSTEM=$(uname -m)
+
+
+# echo "$VERSION" 
+# exit
+##
+# Commandes clonezilla
+##
+# COMMAND_RESTORE="/usr/sbin/ocs-sr -scr -e1 auto -e2 -nogui $NO_ASK -r -j2 -p true restoredisk $BACKUP sda"		
+if [[ "$ARCH_SYSTEM" == "i686" ]]; then
+    VERSION=3.0 
+    CHECK_SAVE="-sc"
+    CHECK_RESTORE="-sc"
+fi
+BACKUP="$( cat "$RELEASE$VERSION" )"
+NAME_CALUX="$( (( ! CREATE )) && echo "CALUX" || echo "CALUXfce" )-$VERSION-$( date -I | sed  "s/-//g" )" 
+COMMAND_RESTORE="/usr/sbin/ocs-sr $CHECK_RESTORE -e1 auto -e2 -nogui $NO_ASK -r -j2 -p true restoredisk $BACKUP sda"
+COMMAND_SAVE="/usr/sbin/ocs-sr $CHECK_SAVE -q2 -c -j2 -z1 -i 1000 -p true savedisk $NAME_CALUX sda"
+
+# (( $PARAM_ARCH )) && COMMAND_RESTORE="/usr/sbin/ocs-sr -sc -e1 auto -nogui $NO_ASK -r -j2 -p true restoredisk $BACKUP sda"
+FILE_COMMANDS=/tmp/calux_command
+touch /tmp/calux_command
+
+source $WORK_DIR/futil
+source $WORK_DIR/doexec
+source $WORK_DIR/chroot_common.sh
+source $WORK_DIR/bash-utils.sh
+
+if [ "$OP" == "" ]; then
+	die "Aucun parametre ! (restore/save/iso) !"
+else
+	case $OP in
+# 		SAUVEGARDE DE L'IMAGE 
+		save)
+			[[ -e $HOME_DISK ]] && die "Il existe déjà une partition \"$HOME_LABEL\" ! L'image disque à restaurer doit contenir 2 partitions seulement"
+#			Montage des partition sroot et home
+			msg_n "Sauvegarde du disque dans une image avec la commande suivante"
+			msg_n2 "$COMMAND_SAVE"
+			rid_exit "Lancer la sauvegarde ?" && exit
+# 			chroot_setup "$ROOT_CALUX"
+# 			
+# 			msg_n2 "Desinstallation de tout les paquets inutiles et périmés"
+# 			chroot2calux "aptitude autoclean"
+# 			chroot2calux "apt-get autoremove --purge"
+# 			# Il vaut mieux effacer les lives de calux dans /home/PinguyBuilder...
+# 			if [ -e $ROOT_CALUX/home/PinguyBuilder ];then
+# 				msg_n2 "Suppression des fichiers de PinguyBuilder"
+# 				chroot2calux "rm -R /home/PinguyBuilder"
+# 			fi
+# 			
+# 			msg_n2 "Suppression des paquets du cache"
+# 			chroot2calux "aptitude clean"
+# 			run_once calux_maj
+# 			teardown "reset"
+			
+			if ! $COMMAND_SAVE; then
+				die "Echec de la sauvegarde !"
+			else
+				# On inscrit la nouvelle version de calux dans calux_version
+				cd /home/partimag/					
+				(( ! CREATE )) && echo "$NAME_CALUX" > $RELEASE$VERSION ||  echo "$NAME_CALUX" > calux_create_version
+				chmod +r $NAME_CALUX/*
+			fi
+		;;
+#		RESTAURATION DE L'IMAGE 
+		restore)
+# 			COMMAND_RESTORE="/usr/sbin/ocs-sr -scr -e1 auto -e2 -nogui $NO_ASK -r -j2 -p true restoredisk $BACKUP sda"
+#             COMMAND_RESTORE="/usr/sbin/ocs-sr -scr -e1 auto -e2 -nogui $NO_ASK -c -r -j2 -p true restoredisk $BACKUP sda"
+			# Clonezilla 3.8 command
+# 			echo $PARAM_ARCH
+			
+			msg_n "Restauration de l'image \"%s\" avec la commande suivante" "$BACKUP"
+			msg_n2 "$COMMAND_RESTORE" 
+			if is_confirm; then
+				CLEAN="$( ! rid_1 "Déployer la distribution ? [ O/n ]" )"
+				while [[ "$CLEAN" != "$_yes" ]] && [[ "$CLEAN" != "$_no" ]] && [[ "$CLEAN" != "" ]]; do
+					CLEAN="$( ! rid_1 "Déployer la distribution ? [ O/n ]" )"
+				done
+			fi
+			msg_nn_end
+
+			if ! run_once calux_restore; then
+				die "La restauration a échoué !"
+			else
+				if [[ "$CLEAN" == "o" ]]; then
+					run_once calux_create_home
+					if ! run_once calux_format_part; then
+						die "Une erreur est survenue lors du formatage !"
+					fi
+					UUID=$(blkid | grep $HOME_LABEL | awk '{print $3}' | sed -e "s/\"//g")
+					LABEL=$(blkid | grep $HOME_LABEL | awk '{print $2}' | sed -e "s/\"//g")
+					run_once calux_conf_part
+					run_once calux_clean
+				fi
+				chroot_setup "$ROOT_CALUX"
+				if (( CREATE )); then
+# 					Toute cette section va créer tout ce qu'il faut pour créer une nouvelle Calux à partir d'une LinuxMint de base...
+# 					cd /home/partimag
+					mkdir $ROOT_CALUX/tmp/calux-install
+					cp -R /tmp/{embedded.sh,futil} $ROOT_CALUX/tmp/calux-install
+					cp -R /home/partimag/{calux_create*,files} $ROOT_CALUX/tmp/calux-install
+					cd /home/partimag/					
+# 					Et c'est parti pour une nouvelle personnalisation
+					chroot2calux "bash /tmp/calux-install/calux_create $CREATE"
+				fi
+# 				if run_once calux_maj; then
+#                     [[ "$CLEAN" == "o" ]] && loading "Désinstallation de apt-cacher-ng" "Terminé !" chroot2calux "apt remove apt-cacher-ng"
+#                     chroot2calux "service smbd status"
+#                     # On arrete les services qui font ch***
+#                     chroot2calux "service smbd stop"
+#                     chroot2calux "service nmbd stop"
+#                     chroot2calux "service udev stop"
+#                     # chroot2calux "service smbd status"
+#                 fi
+                run_once calux_install_grub
+# 				lsof | grep $ROOT_CALUX
+# 				loading "Veuillez patienter..." "\r" sleep 10
+# 				lsof | grep $ROOT_CALUX
+# 				loading "Installation de GRUB sur le disque %s..." "Grub à été installé sur %s." "$DISK_CALUX" arch_chroot "grub-install --recheck $DISK_CALUX"
+# 				loading "Création du fichier de configuration GRUB" "Fichier de configuration GRUB créé." arch_chroot "update-grub" 
+			fi
+		;;
+#		GENERER L'ISO..
+# TODO A refaire si besoin....
+		iso)
+			msg_n "GENERATION DE L'IMAGE ISO clonezilla avec le script /embedded.sh avec la commande suivante"
+			msg_n2 "ocs-iso -a Calux-3.0-clonezilla-`date -I | sed  "s/-//g"`  -n "d" -g fr_FR.UTF-8 -k fr -s -m ./embedded-iso.sh"
+			rid_exit "Créer l'ISO de Clonezilla ? [ O/n ]" 
+
+			#COPIE FONDS
+			cp files/syslinux.png /usr/share/drbl/image/ocswp-grub2.png
+			cp files/syslinux.png /usr/share/drbl/image/ocswp.png
+			sed -i "s/bash calux_utils \$OP/bash calux_utils restore/" /home/partimag/embedded-iso.sh
+			ocs-iso -a Calux-3.0-clonezilla-`date -I | sed  "s/-//g"`  -n "d" -g fr_FR.UTF-8 -k fr -s -m ./embedded-iso.sh
+		;;
+		# Creation d'un iso live
+		iso-live)
+			msg_n "GENERATION DE L'IMAGE ISO Calux-3.0 avec le script build-iso-live.sh"
+			chroot_setup "$ROOT_CALUX"
+			[[ -e $HOME_DISK ]] && chroot_add_mount $HOME_DISK "$ROOT_CALUX/home" 
+			calux_iso
+			teardown "reset" 
+		;;
+		chroot)
+			msg_n "32" "32" "Entre dans l'environnement chroot"
+			chroot_setup "$ROOT_CALUX"
+			chroot2calux "/bin/bash"
+			teardown "reset" 
+		;;
+		maj)
+			msg_n "32" "32" "Démarrage de la mise à jour"
+			chroot_setup "$ROOT_CALUX"
+			run_once calux_maj
+			teardown "reset" 
+		;;
+		*)
+			error "Paramètres invalide : %s" "$@"
+	esac
+fi

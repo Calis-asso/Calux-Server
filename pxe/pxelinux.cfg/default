@@ -1,0 +1,17 @@
+DEFAULT menu.c32
+UI vesamenu.c32
+PROMPT 0
+MENU BACKGROUND splash.png
+MENU TITLE PXE Boot System on calis.asso network
+NOESCAPE 1
+
+MENU INCLUDE pxelinux.cfg/head.conf 
+###
+# Insert your systems here !
+MENU INCLUDE pxelinux.cfg/systems.conf 
+
+# MENU INCLUDE pxelinux.cfg/old_systems.conf 
+
+
+MENU INCLUDE pxelinux.cfg/tail.conf
+

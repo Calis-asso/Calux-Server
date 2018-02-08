@@ -1,0 +1,13 @@
+#!/usr/bin/env xdg-open
+
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Icon=/usr/share/plymouth/themes/calux-logo/mint-logo.png
+Icon[fr_FR]=/usr/share/plymouth/themes/calux-logo/mint-logo.png
+Name[fr_FR]=Configurer pour reconditionner
+Exec=mate-terminal -e 'sudo bash /home/cadm/switch_connexions.sh add && bash'
+Comment[fr_FR]=Configurer pour reconditionner
+Name=Configurer pour reconditionner
+Comment=Configurer pour reconditionner

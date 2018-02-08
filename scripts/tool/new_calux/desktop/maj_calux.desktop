@@ -1,0 +1,12 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Icon=aptdaemon-upgrade.png
+Icon[fr_FR]=aptdaemon-upgrade.png
+Name[fr_FR]=Mettre Calux à jour
+Exec=mate-terminal -e 'bash /home/user/Bureau/CALIS-INIT/prepare_2_maj.sh'
+Comment[fr_FR]=Mettre Calux à jour
+Name=Mettre Calux à jour 
+Comment=Mettre Calux à jour

@@ -1,0 +1,12 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Icon=mintupdate-release-upgrade
+Icon[fr_FR]=mintupdate-release-upgrade
+Name[fr_FR]=Finaliser Calux 4.0
+Exec=mate-terminal -e '/home/user/Bureau/CALIS-INIT/finalisation_calux.sh'
+Comment[fr_FR]=Finaliser l'installation
+Name=Finaliser Calux 4.0
+Comment=Finaliser l'installation

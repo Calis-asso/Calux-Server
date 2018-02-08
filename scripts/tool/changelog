@@ -1,0 +1,80 @@
+########################################
+# Modification linuxmint 18.3 x64 mate #
+########################################
+
+########################################
+#
+#   Personalisation du systeme
+#
+- Changement des fonctions des touches PgUp et PgDown ( terminal feature )
+- Désinstallation de rhythmbox xplayer
+- Installation de "gbrainy gweled pychess gnome-sudoku gnome-mines gnome-mahjongg aisleriot clementine gnome-orca pidgin-otr pidgin-bot-sentry pidgin-microblog pidgin-privacy-please audacity" clonezilla
+- Installation de "apt-cacher-ng" pour installation des mises a jour sans connexion Internet
+- Installation des drivers pour virtualbox "virtualbox-guest-x11 virtualbox-guest-dkms"
+- Installation des mises à jours
+- On modifie les associations de fichiers audio pour clementine (sinon c'est audacity par défaut...)
+
+
+########################################
+#
+#   Personalisation de grub
+#
+- Ajout des entrées Redemarrer et Eteindre dans le menu grub
+- Modification du fond d'écran
+- Suppression des entrées permettant le test des barettes de mémoire "memtest"
+- Modification de diverses options concernant l'affichage et le temps d'affichage...
+
+
+########################################
+#
+#   Personalisation du splash screen
+#
+- Copie du theme de base
+- Modification du theme recopie avec le logo CALIS
+
+########################################
+#
+#   PinguyBuilder 
+#
+- Telechargement de PinguyBuilder
+- Installation des dépendances "squashfs-tools ubiquity-frontend-debconf discover xresprobe aufs-tools dpkg-dev plymouth-x11"
+- Installation de PinguyBuilder
+- Personalisation... 
+
+########################################
+#
+#   GCompris-qt
+#
+- Conservation du lanceur et de l'icone de gcompris
+- Désinstallation de gcompris
+- Telechargement de gcompris-qt 
+- Installation de gcompris-qt dans /opt
+- Création d'un nouveau lanceur
+- Telechargement des fichiers audio francais
+
+########################################
+#
+#   Personalisation de firefox
+#
+- Renommage du dossier utilisateur par defaut
+- Bloqueur de publicité : Installation du module complémentaire ublock origins 
+- Moteur de recherche : Installation du module complémentaire qwant
+- Ajout de la barre de recherche
+- Affichage de la barre personelle
+- Ajout dans la barre personelle des sites suivants : calis-asso.org, services framasoft, openstreetmap
+- qwant en page d'accueil 
+- Interface sans blancs
+
+########################################
+
+########################################
+#
+# Autres
+#
+- Écran de veille à 15 minutes et sans verrouillage automatique
+- Desactiver le vérouillage de l'écran de veille
+- Suppression icone "terminal" dans la barre des taches...
+- Ajout de clementine et libreoffice dans les favoris
+- Copie du livret du libre et du guide d'autodefense numérique
+- installation de numlockx et activation du verouillage numerique des le lancement de lightdm
+- Suppression des paquets de langues inutiles (reste le francais FRANCE et l'anglais USA)...

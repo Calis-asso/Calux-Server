@@ -1,0 +1,13 @@
+#!/usr/bin/env xdg-open
+
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Icon=/usr/share/icons/Mint-X-Dark/status/24/nm-device-wireless.png
+Icon[fr_FR]=mintupdate-release-upgrade
+Name[fr_FR]=Installer drivers WiFi Broadcom
+Exec=mate-terminal -e '/home/user/Bureau/CALIS-INIT/install_b43.sh'
+Comment[fr_FR]=Installer drivers WiFi Broadcom
+Name=Installer drivers WiFi Broadcom
+Comment=Installer drivers WiFi Broadcom

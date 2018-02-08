@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# BEGIN Minimal msgs info
+msg_info() { local txt=$1; shift; printf " $(date +%H:%M:%S) [ INFO  ] $txt\n" "$@"; }
+msg_error() { local txt=$1; shift; printf " $(date +%H:%M:%S) [ ERROR ] $txt\n" "$@"; }
+# END

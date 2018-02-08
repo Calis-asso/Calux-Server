@@ -1,0 +1,155 @@
+###### NEW CALUX ######
+
+# 20160125
+# Live avec l'utilisateur public ?
+#
+# j'ai tout refais a partir de calux 20151125...
+# A ajouter dans CALIS-INIT/nettoyage.sh
+# [ -e ~/Bureau/calux-install ] && rm -R ~/Bureau/calux-install
+# sed -i "s/administrateur/user/" /home/user/.config/gtk-3.0/bookmarks 
+
+
+# 20160113 / 0119
+# Création d'un live !
+# cd Bureau/CALIS-INIT
+#
+# installation de clonezilla et des tierse parties pour PinguyBuilder
+# sudo aptitude -y install squashfs-tools ubiquity-frontend-debconf discover xresprobe aufs-tools dpkg-dev plymouth-x11 clonezilla partclone
+#
+# Téléchargement de pinguybuilder_3
+# wget http://sourceforge.net/projects/pinguy-os/files/ISO_Builder/pinguybuilder_3.3-2_all.deb
+#
+# installation de  pinguybuilder_3
+# sudo dpkg -i pinguybuilder_3.3-2_all.deb
+#
+# récupérations des fichiers nécessaires sur le serveur
+# sudo mount 192.168.0.5:/ /mnt
+#
+# Création de l'archive
+# cd /mnt/scripts/calux/minimal
+# bash build-minimal.sh /home/user/Bureau/CALIS-INIT
+# cd /home/user/Bureau/
+# tar zxf CALIS-INIT/*.tar.gz
+#
+# Maintenant on peut utiliser Bureau/calux-install/build-iso-live.sh pour construire l'iso
+
+
+# tar zxf calux-011316.tar.gz
+# désinstallation des tierse parties pour PinguyBuilder
+# sudo aptitude -y purge squashfs-tools ubiquity-frontend-debconf discover xresprobe aufs-tools dpkg-dev plymouth-x11 
+
+# 20161101
+# Personalisation du splash screen
+# sudo cp -R /lib/plymouth/themes/mint-logo/ /lib/plymouth/themes/calux-logo/
+
+# cd /lib/plymouth/themes/calux-logo/
+# sudo mv mint-logo.plymouth calux-logo.plymouth
+# sudo mv mint-logo.script calux-logo.script
+# # Nouveau logo adapté dans REP_CLONEZILLA/IMGS/files/logo.png
+# sudo cp /boot/calisboot.png /lib/plymouth/themes/calux-logo/logo.png
+# 		sudo nano calux-logo.plymouth # ou les bonnes vielles commandes sed...
+# sudo sed -i "s/^\(Name=\).*/\1Calux Logo/" calux-logo.plymouth
+# cat calux-logo.plymouth | sed "s/^\(Name=\).*/\1Calux Logo/" | sed "s/mint-logo/calux-logo/g" > /tmp/calux-logo.plymouth
+# sudo cp /tmp/calux-logo.plymouth /lib/plymouth/themes/calux-logo/
+# sudo update-alternatives --install /lib/plymouth/themes/default.plymouth default.plymouth /lib/plymouth/themes/calux-logo/calux-logo.plymouth 100
+# # Calux-logo is in place !
+# sudo update-alternatives --config default.plymouth
+# # On change le texte ( qui s'affiche si le logo ne se charge pas ) aussi tant qu'on y est 
+# sudo sed -i "s/\(title=\).*/\1Calux 3.0/" /lib/plymouth/themes/text.plymouth
+# sudo sed -i "s/^\(Name=\).*/\1Calux Text/" /lib/plymouth/themes/text.plymouth
+# # On recompile l'initramfs
+# sudo update-initramfs -u
+# # Et on reboote...
+
+
+
+# DONE IMG 20151125
+# 
+# sed -i "s/\"history -c\"/history -c/" ~/Bureau/CALIS-INIT/nettoyage.sh
+# rm ~/tmp 
+# rmdir ~/Desktop/
+# 
+# vt7 ==> vt8 ????
+# sudo su
+# echo "0=Standard vt7" >> /etc/mdm/mdm.conf # Ca parait bon 
+#
+# GRUB
+# echo -e "\n\nmenuentry \"System shutdown\" {\n\techo \"System shutting down...\"\n\thalt\n}" >> /etc/grub.d/40_custom
+# echo -e "\n\nmenuentry \"System restart\" {\n\techo \"System rebooting...\"\n\treboot\n}" >> /etc/grub.d/40_custom
+# sudo sed -i "s/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/" /etc/default/grub
+# sudo sed -i "s/GRUB_BACKGROUND=.*/GRUB_BACKGROUND=/boot/calisboot.png/" /etc/default/grub
+# sudo cp /home/user/Bureau/CALIS-INIT/calisboot.png /boot/
+# 
+# sudo update-grub
+#
+# MAJ avec aptitude
+# sed -i "s/apt-get/aptitude/g"  ~/Bureau/CALIS-INIT/nettoyage.sh
+# sed -i "s/remastersys//g"  ~/Bureau/CALIS-INIT/nettoyage.sh
+
+#SCHEMA PARTITION 201511??
+# 1.5Go swap 
+# 15Go /
+#
+
+##REINIT PASS ROOT
+# passwd -l -d root
+
+##NEW USERNAME
+# usermod -l user -d /home/user -m administrateur
+# CHANGER LE NOM COMPLET DE L'UTILISATEUR ...
+# GROUPE !
+# groupmod -n user administrateur
+
+
+##NEW HOSTAME
+##REMPLACEMENT AUTO
+# sed -i "s/ubuntu/calux/g" /etc/hostname
+# sed -i"s/ubuntu/calux/g" /etc/hosts
+##POUR VERIFIER OU LE FAIRE SOI MEME
+# nano /etc/hostname
+# nano /etc/hosts
+
+##REMOVE REMASTERSYS
+# aptitude remove remastersys
+
+##MAJ
+##MOUNT & COPIE DES PAQUETS SERVEUR
+# sudo mount arch-srv:/ /mnt
+# sudo cp /mnt/packages/mint.32/*.deb /var/cache/apt/archives/
+# sudo aptitude upgrade && sudo aptitude dist-upgrade
+
+##VIDER CACHE
+# sudo rm /var/cache/apt/archives/*.deb
+
+########### FIREFOX
+# ublock 
+# Calis http://calis-asso.org/
+# OSM http://openstreetmap.org/
+# Mailoo https://www.mailoo.org/
+# ixquick https://www.ixquick.com/
+#Framasoft
+#https://framasphere.org/
+#https://framindmap.org/c/login
+#https://framadate.org/
+#https://framapad.org/
+#https://framanews.org/
+#https://framacalc.org/_start
+#http://framavectoriel.org/
+#https://framabag.org/
+#https://framapic.org/
+#http://framagames.org/
+#http://framabookin.org/
+#https://frama.link/
+
+#DEMARRER => APPLICATION
+
+##### CLONEZILLA #####
+# CREER PROCEDURE DE SAUVEGARDE
+# LOGIQUEMENT TOUT ROULE
+# Voir calux_utils et embedded.sh
+
+#Virer conf chromium
+
+# USB BOOT : /dev/sdx2 debut : Premier secteur 501056
+
+CHANGER LES UUID DES DISQUES !!!
