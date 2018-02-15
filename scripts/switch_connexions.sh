@@ -69,8 +69,8 @@ function msg_log() {
 }
 
 function msg_user() {
-	[[ ! -z $DISPLAY ]] && sudo -u $USER2USE DISPLAY=:0 notify-send "$@"
-#	sudo -u $USER2USE DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus	notify-send "$@"
+# 	[[ ! -z $DISPLAY ]] && sudo -u $USER2USE DISPLAY=:0 notify-send "$@"
+	[[ ! -z $DISPLAY ]] && sudo -u $USER2USE DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u $USER2USE)/bus	notify-send "$@"
 }
 
 function connect_wifi() {
